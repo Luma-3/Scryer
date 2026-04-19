@@ -4,10 +4,10 @@
 #include <unistd.h>
 
 int main(void) {
-  char msg[] = "Allocation...\n";
-  write(1, msg, strlen(msg));
-  void *ptr = malloc(100);
-  free(ptr);
-  printf("End");
-  return EXIT_SUCCESS;
+    char msg[] = "Allocation...\n";
+    write(1, msg, strlen(msg));
+    void *ptr = malloc(100);
+    free(ptr);
+
+    return EXIT_SUCCESS;
 }
