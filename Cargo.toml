@@ -8,5 +8,6 @@ resolver = "3"
 
 
 [dependencies]
+signal-hook = "0.4.4"
 
 
