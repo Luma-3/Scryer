@@ -6,6 +6,8 @@ use std::{env, io, thread};
 
 const SOCK_PATH: &str = "/tmp/scry.sock";
 
+include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
 fn open_socket() -> io::Result<UnixDatagram> {
     let socket = UnixDatagram::bind(SOCK_PATH)?;
     socket.set_nonblocking(true)?;

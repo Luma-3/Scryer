@@ -1,3 +1,4 @@
+#include "memory_event.h"
 #include <dlfcn.h>
 #include <stddef.h>
 #include <unistd.h>
@@ -9,8 +10,12 @@ void *malloc(size_t size) {
         real_malloc = dlsym(RTLD_NEXT, "malloc");
     }
 
-    write(1, "malloc called\n", 14);
-
     void *ptr = real_malloc(size);
+
+    memory_event_t msg =
+    {
+
+    }
+
     return ptr;
 };

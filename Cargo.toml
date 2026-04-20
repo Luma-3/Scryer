@@ -10,4 +10,7 @@ resolver = "3"
 [dependencies]
 signal-hook = "0.4.4"
 
+[build-dependencies]
+bindgen = "0.72.1"
+
 

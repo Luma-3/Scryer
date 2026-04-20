@@ -1,5 +1,5 @@
 CC		=	gcc
-CFLAGS	=	-Wall -Wextra -Werror -fPIC
+CFLAGS	=	-Wall -Wextra -Werror -fPIC 
 LDFLAGS	=	-shared -ldl
 
 TARGET	= libspy.so
