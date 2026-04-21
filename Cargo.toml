@@ -5,12 +5,16 @@ edition = "2024"
 
 [workspace]
 resolver = "3"
+members = [
+	"spy",
+	"common"
+]
 
 
 [dependencies]
+shared_memory = "0.12.4"
 signal-hook = "0.4.4"
+common = { path = "./common" }
 
-[build-dependencies]
-bindgen = "0.72.1"
 
 

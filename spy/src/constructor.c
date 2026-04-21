@@ -3,6 +3,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+int sock_fd = -1;
+
 char *get_path_socket(char **envp) {
     const char env_name[] = "SCRY_SOCK_PATH=";
     int size_name = 15;
@@ -21,7 +23,6 @@ __attribute__((constructor)) void init(int argc, char **argv, char **envp) {
     (void)argc;
     (void)argv;
 
-    int sock_fd;
     int ret;
     char *sock_path;
 

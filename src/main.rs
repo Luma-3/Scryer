@@ -1,22 +1,43 @@
+use common::SharedData;
+use shared_memory::{ShmemConf, ShmemError};
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::os::unix::net::UnixDatagram;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{env, io, thread};
 
-const SOCK_PATH: &str = "/tmp/scry.sock";
+// const SOCK_PATH: &str = "/tmp/scry.sock";
 
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+const LIB_PATH: &str = "./target/debug/libspy.so";
 
-fn open_socket() -> io::Result<UnixDatagram> {
-    let socket = UnixDatagram::bind(SOCK_PATH)?;
-    socket.set_nonblocking(true)?;
-    Ok(socket)
+// fn open_socket() -> io::Result<UnixDatagram> {
+//     let socket = UnixDatagram::bind(SOCK_PATH)?;
+//     socket.set_nonblocking(true)?;
+//     Ok(socket)
+// }
+
+fn open_shmem() -> io::Result<&'static mut SharedData> {
+    let shmem_conf = shared_memory::ShmemConf::new()
+        .size(4096)
+        .os_id("scry_shmem");
+
+    let shmem = match shmem_conf.create() {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("Unble to create shared memory {e}");
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Failed to create shared memory",
+            ));
+        }
+    };
+
+    let data = unsafe { &mut *(shmem.as_ptr() as *mut SharedData) };
+
+    Ok(data)
 }
 
 fn main() -> std::io::Result<()> {
-    let mut buf = vec![0; 100];
-
     let args: Vec<String> = env::args().collect();
 
     let run = Arc::new(AtomicBool::new(true));
@@ -30,11 +51,11 @@ fn main() -> std::io::Result<()> {
         }
     });
 
-    let socket = open_socket()?;
+    let shmem_data = open_shmem()?;
 
     let output = std::process::Command::new(&args[1])
         .envs([
-            ("LD_PRELOAD", "./spy/libspy.so"),
+            ("LD_PRELOAD", LIB_PATH),
             ("SCRY_SOCK_PATH", "/tmp/scry.sock"),
         ])
         .output()?;
@@ -42,24 +63,11 @@ fn main() -> std::io::Result<()> {
     println!("{:?}", std::str::from_utf8(output.stdout.as_slice()));
     println!("Starting while");
     while run.load(Ordering::Acquire) {
-        match socket.recv(buf.as_mut_slice()) {
-            Ok(size) => {
-                let msg = std::str::from_utf8(&buf[..size]).expect("Failed to parse message");
-                println!("{}", msg);
-            }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                // No data available, just continue
-                continue;
-            }
-            Err(e) => {
-                eprintln!("Error receiving message: {}", e);
-                break;
-            }
-        }
+        let event = &shmem_data.buffer[shmem_data.tail.load(Ordering::Acquire) % 1024];
+        println!("Event:\n\t size: {}\n\tptr: {:x}", event.size, event.ptr);
+        shmem_data.tail.fetch_add(1, Ordering::Release);
     }
     println!("Exiting...");
-    socket.shutdown(std::net::Shutdown::Both)?;
-    std::fs::remove_file(SOCK_PATH)?;
 
     Ok(())
 }
