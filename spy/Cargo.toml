@@ -5,7 +5,9 @@ edition = "2024"
 
 
 [dependencies]
+common = { path = "../common" }
 libc = "0.2"
+shared_memory = "0.12.4"
 
 [lib]
 crate-type = ["cdylib"]

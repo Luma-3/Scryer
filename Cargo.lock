@@ -198,7 +198,9 @@ dependencies = [
 name = "spy"
 version = "0.1.0"
 dependencies = [
+ "common",
  "libc",
+ "shared_memory",
 ]
 
 [[package]]

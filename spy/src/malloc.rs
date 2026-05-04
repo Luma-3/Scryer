@@ -1,4 +1,7 @@
 use std::os::raw::c_void;
+use std::sync::atomic::Ordering;
+
+use crate::{SHMEM_PTR, get_shmem};
 
 #[unsafe(no_mangle)]
 pub extern "C" fn malloc(size: usize) -> *mut u8 {
@@ -11,6 +14,11 @@ pub extern "C" fn malloc(size: usize) -> *mut u8 {
 
         let msg = "Malloc intercept !\n";
         libc::write(1, msg.as_ptr() as *const c_void, msg.len());
+
+        if let Some(shmem) = get_shmem() {
+            let event = &shmem.buffer[shmem.head.load(Ordering::Acquire)];
+            event.size.store(size, Ordering::Release);
+        }
 
         let real_malloc: extern "C" fn(usize) -> *mut u8 = std::mem::transmute(real_malloc_ptr);
         real_malloc(size)
