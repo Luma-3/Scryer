@@ -63,26 +63,41 @@ fn main() -> std::io::Result<()> {
 
     let shmem = SharedController::new()?;
 
-    let output = std::process::Command::new(&args[1])
+    let mut child = std::process::Command::new(&args[1])
         .envs([
             ("LD_PRELOAD", LIB_PATH),
             ("SCRY_SOCK_PATH", "/tmp/scry.sock"),
         ])
-        .output()?;
+        .spawn()?;
 
-    println!("{:?}", std::str::from_utf8(output.stdout.as_slice()));
     println!("Starting while");
-    while run.load(Ordering::Acquire) {
-        let arg_num = shmem.data.tail.load(Ordering::Acquire) % 1024;
-        let event = &shmem.data.buffer[arg_num];
-        println!(
-            "Event:{}\n\tSize: {}\n\tPtr:{}",
-            arg_num,
-            event.size.load(Ordering::Acquire),
-            event.ptr.load(Ordering::Acquire)
-        );
-        thread::sleep(Duration::new(1, 0));
-        shmem.data.tail.fetch_add(1, Ordering::Release);
+    loop {
+        if !run.load(Ordering::Acquire) {
+            child.kill()?;
+            println!("Process Killed !");
+            break;
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                println!("Process Exiting with code {}", status);
+                break;
+            }
+
+            Ok(None) => {
+                let arg_num = shmem.data.tail.load(Ordering::Acquire) % 1024;
+                let event = &shmem.data.buffer[arg_num].load(Ordering::Relaxed);
+                println!(
+                    "Event:{}\n\tSize: {}\n\tPtr:{}\n\tType:{}",
+                    arg_num, event.size, event.ptr, event.event_type,
+                );
+
+                shmem.data.tail.fetch_add(1, Ordering::AcqRel);
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+                break;
+            }
+        }
     }
     println!("Exiting...");
 

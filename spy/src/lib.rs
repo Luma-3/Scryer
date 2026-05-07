@@ -1,8 +1,6 @@
 use common::SharedData;
 use std::sync::OnceLock;
 
-use shared_memory;
-
 mod malloc;
 
 fn safe_print(msg: &str) {
@@ -20,6 +18,7 @@ pub fn get_shmem() -> Option<&'static mut SharedData> {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn init() {
+    // # Safety
     let shmem_conf = shared_memory::ShmemConf::new().os_id("scry_shmem").open();
     if let Ok(shmem) = shmem_conf {
         let ptr = shmem.as_ptr() as usize;

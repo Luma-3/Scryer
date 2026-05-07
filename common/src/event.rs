@@ -8,6 +8,7 @@ pub enum EventType {
 }
 
 #[repr(C)]
+#[derive(Debug, Default)]
 pub struct AllocEvent {
     pub size: usize,
     pub ptr: usize,
@@ -20,6 +21,10 @@ pub struct AtomicAllocEvent {
     pub ptr: AtomicUsize,
     pub event_type: AtomicUsize,
 }
+
+const _: () = assert!(std::mem::size_of::<AllocEvent>() == std::mem::size_of::<AtomicAllocEvent>());
+const _: () =
+    assert!(std::mem::align_of::<AllocEvent>() == std::mem::align_of::<AtomicAllocEvent>());
 
 impl AtomicAllocEvent {
     pub fn store(&self, event: AllocEvent, order: Ordering) {
