@@ -1,7 +1,17 @@
 use std::os::raw::c_void;
 use std::sync::atomic::Ordering;
 
+use common::event::AllocEvent;
+
 use crate::{SHMEM_PTR, get_shmem};
+
+fn pushEvent(event: AllocEvent) {
+    if let Some(shmem) = get_shmem() {
+        let b_event = &shmem.buffer[shmem.head.load(Ordering::Acquire)];
+        event.size.store(event.size, Ordering::Release);
+        event.ptr.store(event.ptr, order);
+    }
+}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn malloc(size: usize) -> *mut u8 {

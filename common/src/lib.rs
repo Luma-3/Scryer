@@ -1,4 +1,4 @@
-mod event;
+pub mod event;
 
 #[repr(C)]
 pub struct SharedData {
