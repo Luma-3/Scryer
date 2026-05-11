@@ -2,9 +2,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[repr(C)]
 pub enum EventType {
-    Alloc = (1 << 1),
-    Dealloc = (1 << 2),
-    Realloc = (1 << 3),
+    Alloc = 1,
+    Dealloc = 2,
+    Realloc = 3,
 }
 
 #[repr(C)]

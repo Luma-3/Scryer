@@ -1,5 +1,4 @@
 use std::os::raw::c_void;
-use std::sync::atomic::Ordering;
 
 use common::event::{AllocEvent, EventType};
 
@@ -18,15 +17,11 @@ pub extern "C" fn malloc(size: usize) -> *mut u8 {
         libc::write(1, msg.as_ptr() as *const c_void, msg.len());
 
         if let Some(shmem) = get_shmem() {
-            let event = &shmem.buffer[shmem.head.fetch_add(1, Ordering::AcqRel)];
-            event.store(
-                AllocEvent {
-                    size,
-                    ptr: 0,
-                    event_type: EventType::Alloc as usize,
-                },
-                Ordering::Release,
-            );
+            let _ = shmem.push(AllocEvent {
+                size,
+                ptr: 0,
+                event_type: EventType::Alloc as usize,
+            });
         }
 
         let real_malloc: extern "C" fn(usize) -> *mut u8 = std::mem::transmute(real_malloc_ptr);

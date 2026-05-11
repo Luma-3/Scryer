@@ -3,7 +3,6 @@ use shared_memory::Shmem;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
 use std::{env, io, thread};
 
 // const SOCK_PATH: &str = "/tmp/scry.sock";
@@ -84,14 +83,19 @@ fn main() -> std::io::Result<()> {
             }
 
             Ok(None) => {
-                let arg_num = shmem.data.tail.load(Ordering::Acquire) % 1024;
-                let event = &shmem.data.buffer[arg_num].load(Ordering::Relaxed);
-                println!(
-                    "Event:{}\n\tSize: {}\n\tPtr:{}\n\tType:{}",
-                    arg_num, event.size, event.ptr, event.event_type,
-                );
-
-                shmem.data.tail.fetch_add(1, Ordering::AcqRel);
+                println!("Waiting for events...");
+                if let Some(event) = shmem.data.pop() {
+                    let arg_num = match event.event_type {
+                        1 => "Alloc",
+                        2 => "Dealloc",
+                        3 => "Realloc",
+                        _ => "Unknown",
+                    };
+                    println!(
+                        "Event:{}\n\tSize: {}\n\tPtr:{}\n\tType:{}",
+                        arg_num, event.size, event.ptr, event.event_type,
+                    );
+                }
             }
             Err(e) => {
                 eprintln!("{}", e);
