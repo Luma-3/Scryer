@@ -1,10 +1,28 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    io,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 #[repr(C)]
+#[derive(Debug)]
 pub enum EventType {
     Alloc = 1,
     Dealloc = 2,
     Realloc = 3,
+}
+
+impl EventType {
+    pub fn from_int(nb: i32) -> std::io::Result<Self> {
+        match nb {
+            1 => Ok(EventType::Alloc),
+            2 => Ok(EventType::Dealloc),
+            3 => Ok(EventType::Realloc),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "AllocType {nb} doesn't exist",
+            )),
+        }
+    }
 }
 
 #[repr(C)]

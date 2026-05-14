@@ -5,30 +5,29 @@ use common::event::{AllocEvent, EventType};
 use crate::get_shmem;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn malloc(size: usize) -> *mut u8 {
+pub extern "C" fn free(ptr: *mut u8) {
     unsafe {
-        let real_malloc_ptr = libc::dlsym(libc::RTLD_NEXT, c"malloc".as_ptr() as *const i8);
+        let real_free_ptr = libc::dlsym(libc::RTLD_NEXT, c"free".as_ptr() as *const i8);
 
-        if real_malloc_ptr.is_null() {
+        if real_free_ptr.is_null() {
             panic!("Failed to find original malloc");
         }
 
-        let msg = "Malloc intercept !\n";
+        let msg = "Free intercept !\n";
         libc::write(1, msg.as_ptr() as *const c_void, msg.len());
 
-        let real_malloc: extern "C" fn(usize) -> *mut u8 = std::mem::transmute(real_malloc_ptr);
+        let real_free: extern "C" fn(*mut u8) = std::mem::transmute(real_free_ptr);
 
-        let ptr = real_malloc(size);
+        real_free(ptr);
 
         let ptr_val = ptr as usize;
 
         if let Some(shmem) = get_shmem() {
             let _ = shmem.push(AllocEvent {
-                size,
+                size: 0,
                 ptr: ptr_val,
-                event_type: EventType::Alloc as usize,
+                event_type: EventType::Dealloc as usize,
             });
         }
-        ptr
     }
 }

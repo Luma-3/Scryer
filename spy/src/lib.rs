@@ -1,6 +1,7 @@
 use common::SharedData;
 use std::sync::OnceLock;
 
+mod free;
 mod malloc;
 
 fn safe_print(msg: &str) {

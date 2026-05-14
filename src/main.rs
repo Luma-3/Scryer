@@ -1,9 +1,16 @@
 use common::SharedData;
+use common::event::EventType;
 use shared_memory::Shmem;
 use signal_hook::{consts::SIGINT, iterator::Signals};
+use std::collections::HashMap;
+use std::process::Child;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{env, io, thread};
+
+mod alloc_data;
+
+use crate::alloc_data::AllocData;
 
 // const SOCK_PATH: &str = "/tmp/scry.sock";
 
@@ -49,61 +56,88 @@ impl SharedController {
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
 
-    let run = Arc::new(AtomicBool::new(true));
-    let run_clone = run.clone();
+    let mut app = App::new(args)?;
+    app.run_loop()?;
 
-    let mut signal = Signals::new([SIGINT])?;
-    thread::spawn(move || {
-        for sig in signal.forever() {
-            println!("Received signal {:?}", sig);
-            run_clone.store(false, Ordering::Release);
-        }
-    });
-
-    let shmem = SharedController::new()?;
-
-    let mut child = std::process::Command::new(&args[1])
-        .envs([
-            ("LD_PRELOAD", LIB_PATH),
-            ("SCRY_SOCK_PATH", "/tmp/scry.sock"),
-        ])
-        .spawn()?;
-
-    println!("Starting while");
-    loop {
-        if !run.load(Ordering::Acquire) {
-            child.kill()?;
-            println!("Process Killed !");
-            break;
-        }
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                println!("Process Exiting with code {}", status);
-                break;
-            }
-
-            Ok(None) => {
-                println!("Waiting for events...");
-                if let Some(event) = shmem.data.pop() {
-                    let arg_num = match event.event_type {
-                        1 => "Alloc",
-                        2 => "Dealloc",
-                        3 => "Realloc",
-                        _ => "Unknown",
-                    };
-                    println!(
-                        "Event:{}\n\tSize: {}\n\tPtr:{}\n\tType:{}",
-                        arg_num, event.size, event.ptr, event.event_type,
-                    );
-                }
-            }
-            Err(e) => {
-                eprintln!("{}", e);
-                break;
-            }
-        }
-    }
-    println!("Exiting...");
+    println!("{:?}", app.alloc_data);
 
     Ok(())
+}
+
+#[derive()]
+struct App {
+    args: Vec<String>,
+    run: Arc<AtomicBool>,
+
+    shmem: SharedController,
+    child: Child,
+
+    pub alloc_data: HashMap<String, AllocData>,
+}
+
+impl App {
+    fn new(args: Vec<String>) -> std::io::Result<Self> {
+        let run = Arc::new(AtomicBool::new(true));
+        let run_clone = run.clone();
+
+        let mut signal = Signals::new([SIGINT])?;
+        thread::spawn(move || {
+            for sig in signal.forever() {
+                println!("Received signal {:?}", sig);
+                run_clone.store(false, Ordering::Release);
+            }
+        });
+
+        let shmem = SharedController::new()?;
+
+        let child = std::process::Command::new(&args[1])
+            .envs([
+                ("LD_PRELOAD", LIB_PATH),
+                ("SCRY_SOCK_PATH", "/tmp/scry.sock"),
+            ])
+            .spawn()?;
+
+        Ok(Self {
+            run,
+            args,
+            shmem,
+            child,
+            alloc_data: HashMap::new(),
+        })
+    }
+
+    pub fn run_loop(&mut self) -> std::io::Result<()> {
+        println!("Starting while");
+        loop {
+            if !self.run.load(Ordering::Acquire) {
+                self.child.kill()?;
+                println!("Process Killed !");
+                break;
+            }
+            match self.child.try_wait() {
+                Ok(Some(status)) => {
+                    println!("Process Exiting with code {}", status);
+                    break;
+                }
+
+                Ok(None) => {
+                    if let Some(event) = self.shmem.data.pop() {
+                        self.alloc_data.insert(
+                            event.ptr.to_string(),
+                            AllocData {
+                                size: event.size,
+                                alloc_type: EventType::from_int(event.event_type as i32)?,
+                            },
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!("{}", e);
+                    break;
+                }
+            }
+        }
+        println!("Exiting...");
+        Ok(())
+    }
 }
